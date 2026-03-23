@@ -1,0 +1,4 @@
+area_responsable,cantidad_alertas
+Administración,2
+RRHH,1
+Títulos,1
