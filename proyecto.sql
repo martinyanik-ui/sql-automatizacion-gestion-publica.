@@ -1,10 +1,7 @@
--- 1. Limpieza inicial (Eliminamos en orden inverso por las Foreign Keys)
+-- 1. Limpieza total para recargar
 DROP VIEW IF EXISTS reporte_critico;
-
 DROP TABLE IF EXISTS alertas_gestion;
-
 DROP TABLE IF EXISTS historial_pasos;
-
 DROP TABLE IF EXISTS tramite_expediente;
 
 -- 2. Creación de Tablas
@@ -29,102 +26,41 @@ CREATE TABLE alertas_gestion (
     id_expediente INTEGER,
     tipo_alerta TEXT,
     nivel_prioridad TEXT,
-    fecha_deteccion DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (id_expediente) REFERENCES tramite_expediente(id_expediente)
+    fecha_deteccion DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 3. Inserción de Datos
-INSERT INTO
-    tramite_expediente
-VALUES
-    (
-        101,
-        'Beca Estudiantil',
-        'Secretaría Académica',
-        '2026-03-01',
-        'Abierto'
-    );
+-- 3. Carga de Datos Masiva (Varios sectores)
+INSERT INTO tramite_expediente VALUES 
+(301, 'Beca Apunte', 'Bienestar', '2026-03-10', 'Abierto'),
+(302, 'Título Posgrado', 'Títulos', '2026-01-05', 'Abierto'),
+(303, 'Alta Docente', 'RRHH', '2026-02-10', 'Abierto'),
+(304, 'Certificado Alumno', 'Alumnos', '2026-03-22', 'Abierto'),
+(305, 'Expediente Compras', 'Administración', '2025-12-01', 'Abierto'),
+(306, 'Validación DNI', 'Alumnos', '2026-03-20', 'Abierto'),
+(307, 'Baja Patrimonial', 'Administración', '2026-01-15', 'Abierto');
 
-INSERT INTO
-    tramite_expediente
-VALUES
-    (
-        102,
-        'Título de Grado',
-        'Títulos',
-        '2026-02-15',
-        'Abierto'
-    );
+-- 4. Movimientos (Simulamos que algunos están trabados)
+INSERT INTO historial_pasos (id_expediente, fecha_movimiento, accion_realizada) VALUES 
+(301, '2026-03-21', 'Movimiento Reciente'),
+(302, '2026-01-10', 'Recibido en Títulos'),    -- TRABADO (>30 días)
+(303, '2026-02-11', 'Pendiente Firma'),       -- TRABADO (>30 días)
+(304, '2026-03-23', 'Iniciado'),
+(305, '2025-12-05', 'Enviado a Contaduría'), -- TRABADO (>30 días)
+(306, '2026-03-22', 'Documento ok'),
+(307, '2026-01-20', 'Para Firma Decano');     -- TRABADO (>30 días)
 
-INSERT INTO
-    tramite_expediente
-VALUES
-    (
-        103,
-        'Certificado Trabajo',
-        'RRHH',
-        '2026-03-20',
-        'Abierto'
-    );
+-- 5. Ejecutar la lógica de Alertas Automáticas
+INSERT INTO alertas_gestion (id_expediente, tipo_alerta, nivel_prioridad)
+SELECT id_expediente, 'EXPEDIENTE PARALIZADO', 'ALTA'
+FROM historial_pasos
+WHERE (julianday('now') - julianday(fecha_movimiento)) > 30;
 
-INSERT INTO
-    historial_pasos (
-        id_expediente,
-        fecha_movimiento,
-        accion_realizada
-    )
-VALUES
-    (101, '2026-03-21', 'Validación');
-
-INSERT INTO
-    historial_pasos (
-        id_expediente,
-        fecha_movimiento,
-        accion_realizada
-    )
-VALUES
-    (102, '2026-02-16', 'Recepción');
-
-INSERT INTO
-    historial_pasos (
-        id_expediente,
-        fecha_movimiento,
-        accion_realizada
-    )
-VALUES
-    (103, '2026-03-22', 'Firma');
-
--- 4. Lógica de Automatización
-INSERT INTO
-    alertas_gestion (id_expediente, tipo_alerta, nivel_prioridad)
-SELECT
-    id_expediente,
-    'ALERTA: EXPEDIENTE PARALIZADO (>30 DÍAS)',
-    'ALTA'
-FROM
-    historial_pasos
-WHERE
-    (julianday('now') - julianday(fecha_movimiento)) > 30;
-
--- 5. Creación de Reporte (VISTA)
+-- 6. Crear la Vista para el Gráfico
 CREATE VIEW reporte_critico AS
-SELECT
-    area_responsable,
-    COUNT(id_expediente) AS cantidad_alertas
-FROM
-    tramite_expediente
-WHERE
-    id_expediente IN (
-        SELECT
-            id_expediente
-        FROM
-            alertas_gestion
-    )
-GROUP BY
-    area_responsable;
+SELECT area_responsable, COUNT(id_expediente) AS cantidad_alertas
+FROM tramite_expediente
+WHERE id_expediente IN (SELECT id_expediente FROM alertas_gestion)
+GROUP BY area_responsable;
 
--- 6. Verificación Final de Resultados
-SELECT
-    *
-FROM
-    reporte_critico;
+-- 7. Ver resultado
+SELECT * FROM reporte_critico;
